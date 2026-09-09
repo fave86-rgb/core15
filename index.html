@@ -56,15 +56,15 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
     </section>
     <div id="round" class="round"></div>
     <div class="bottom"><button id="prev" class="nav">‹</button><button id="done" class="done">FATTO</button><button id="next" class="nav">›</button></div>
-    <div class="version">Core 15 · v1.1</div>
+    <div class="version">Core 15 · v1.2</div>
   </div>
   <section id="finish" class="finish">
     <h1>Allenamento completato</h1><div id="duration" class="big"></div><p id="summary"></p>
-    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.1</div>
+    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.2</div>
   </section>
   <section id="restday" class="restday">
     <h1>Giorno di riposo</h1><div class="big">✓</div><p>Core 15 è programmato dal lunedì al venerdì. Oggi non devi recuperare nulla: il programma riparte automaticamente lunedì.</p>
-    <div class="version">Core 15 · v1.1</div>
+    <div class="version">Core 15 · v1.2</div>
   </section>
 </main>
 <div id="overlay" class="overlay">
@@ -74,7 +74,7 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
   <div class="fb"><button data-v="Troppo facile">Troppo facile</button><button data-v="Giusto">Giusto</button><button data-v="Pesante">Pesante</button><button data-v="Fastidio">Fastidio</button></div>
 </div>
 <script>
-const ANCHOR = new Date(2026,8,7);
+const ANCHOR = new Date(2026,8,7); // lunedì 7 settembre 2026 = Settimana 1
 const BASE = {
   1:[10,8,16,10], 2:[11,9,18,12], 3:[12,10,20,14], 4:[13,11,22,16], 5:[14,12,24,18]
 };
@@ -162,7 +162,32 @@ function finishWorkout(){
 }
 $("restart").onclick=()=>{localStorage.removeItem(key);location.reload()};
 render();
-if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js");
+
+// Mantiene lo schermo acceso mentre Core 15 è visibile.
+let wakeLock = null;
+async function keepScreenAwake(){
+  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+  try {
+    if (wakeLock && !wakeLock.released) return;
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release",()=>{ wakeLock = null; });
+  } catch (err) {
+    wakeLock = null;
+  }
+}
+// Prova subito; se iOS richiede un'interazione, riprova al primo tocco.
+keepScreenAwake();
+document.addEventListener("pointerdown",keepScreenAwake,{once:true,passive:true});
+document.addEventListener("visibilitychange",()=>{
+  if (document.visibilityState === "visible") keepScreenAwake();
+});
+if("serviceWorker" in navigator){
+  let reloadedForSW=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(!reloadedForSW){reloadedForSW=true;location.reload();}
+  });
+  navigator.serviceWorker.register("./sw.js",{updateViaCache:"none"}).then(reg=>reg.update()).catch(()=>{});
+}
 </script>
 </body>
 </html>

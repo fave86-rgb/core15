@@ -56,15 +56,15 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
     </section>
     <div id="round" class="round"></div>
     <div class="bottom"><button id="prev" class="nav">‹</button><button id="done" class="done">FATTO</button><button id="next" class="nav">›</button></div>
-    <div class="version">Core 15 · v1.2</div>
+    <div class="version">Core 15 · v1.3</div>
   </div>
   <section id="finish" class="finish">
     <h1>Allenamento completato</h1><div id="duration" class="big"></div><p id="summary"></p>
-    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.2</div>
+    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.3</div>
   </section>
   <section id="restday" class="restday">
     <h1>Giorno di riposo</h1><div class="big">✓</div><p>Core 15 è programmato dal lunedì al venerdì. Oggi non devi recuperare nulla: il programma riparte automaticamente lunedì.</p>
-    <div class="version">Core 15 · v1.2</div>
+    <div class="version">Core 15 · v1.3</div>
   </section>
 </main>
 <div id="overlay" class="overlay">
@@ -124,7 +124,7 @@ function render(){
   $("round").textContent=`GIRO ${r}/3 · ESERCIZIO ${e+1}/4`;
   $("visual").innerHTML=art(EX[e][3],anim);
   $("progress").innerHTML=Array.from({length:12},(_,i)=>`<span class="seg ${i<idx?'done':i===idx?'now':''}"></span>`).join("");
-  localStorage.setItem(key,JSON.stringify({idx,completed:false,week:weekInCycle,day,cycle,doses}));
+  localStorage.setItem(key,JSON.stringify({idx,completed:false,week:weekInCycle,cycle,doses}));
 }
 setInterval(()=>{if(day>=1&&day<=5&&!$("overlay").classList.contains("show")&&!$("finish").classList.contains("show")){anim=anim?0:1;$("visual").innerHTML=art(EX[idx%4][3],anim)}},850);
 function advance(){
@@ -146,7 +146,7 @@ $("next").onclick=()=>{idx=Math.min(11,idx+1);render()};
 document.querySelectorAll(".fb button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".fb button").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");
   let a=JSON.parse(localStorage.getItem("core15-feedback")||"[]");
-  a.push({date:key,step:idx,value:b.dataset.v,week:weekInCycle,day,cycle});
+  a.push({date:key,step:idx,value:b.dataset.v,week:weekInCycle,cycle});
   localStorage.setItem("core15-feedback",JSON.stringify(a));
 });
 function showCompleted(sec){
@@ -157,7 +157,7 @@ function showCompleted(sec){
 function finishWorkout(){
   clearInterval(timer);$("overlay").classList.remove("show");
   let sec=Math.max(0,Math.round((Date.now()-start)/1000));
-  localStorage.setItem(key,JSON.stringify({idx:12,completed:true,duration:sec,week:weekInCycle,day,cycle,doses}));
+  localStorage.setItem(key,JSON.stringify({idx:12,completed:true,duration:sec,week:weekInCycle,cycle,doses}));
   saved={completed:true,duration:sec};showCompleted(sec);
 }
 $("restart").onclick=()=>{localStorage.removeItem(key);location.reload()};
@@ -175,9 +175,15 @@ async function keepScreenAwake(){
     wakeLock = null;
   }
 }
-// Prova subito; se iOS richiede un'interazione, riprova al primo tocco.
+// Safari/WebKit su iPhone richiede un gesto dell’utente per concedere il Wake Lock.
+// Proviamo subito e poi, finché non è attivo, a ogni tocco/click reale dentro l’app.
 keepScreenAwake();
-document.addEventListener("pointerdown",keepScreenAwake,{once:true,passive:true});
+async function wakeFromUserGesture(){
+  if (!wakeLock || wakeLock.released) await keepScreenAwake();
+}
+document.addEventListener("touchend",wakeFromUserGesture,{passive:true});
+document.addEventListener("pointerup",wakeFromUserGesture,{passive:true});
+document.addEventListener("click",wakeFromUserGesture,{passive:true});
 document.addEventListener("visibilitychange",()=>{
   if (document.visibilityState === "visible") keepScreenAwake();
 });

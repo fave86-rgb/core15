@@ -56,15 +56,15 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
     </section>
     <div id="round" class="round"></div>
     <div class="bottom"><button id="prev" class="nav">‹</button><button id="done" class="done">FATTO</button><button id="next" class="nav">›</button></div>
-    <div class="version">Core 15 · v1.3</div>
+    <div class="version">Core 15 · v1.4</div>
   </div>
   <section id="finish" class="finish">
     <h1>Allenamento completato</h1><div id="duration" class="big"></div><p id="summary"></p>
-    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.3</div>
+    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.4</div>
   </section>
   <section id="restday" class="restday">
     <h1>Giorno di riposo</h1><div class="big">✓</div><p>Core 15 è programmato dal lunedì al venerdì. Oggi non devi recuperare nulla: il programma riparte automaticamente lunedì.</p>
-    <div class="version">Core 15 · v1.3</div>
+    <div class="version">Core 15 · v1.4</div>
   </section>
 </main>
 <div id="overlay" class="overlay">
@@ -73,6 +73,7 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
   <div class="restBtns"><button id="plus">+15 s</button><button id="skip" class="skip">SALTA</button></div>
   <div class="fb"><button data-v="Troppo facile">Troppo facile</button><button data-v="Giusto">Giusto</button><button data-v="Pesante">Pesante</button><button data-v="Fastidio">Fastidio</button></div>
 </div>
+<script src="https://unpkg.com/nosleep.js@0.9.0/dist/NoSleep.min.js"></script>
 <script>
 const ANCHOR = new Date(2026,8,7); // lunedì 7 settembre 2026 = Settimana 1
 const BASE = {
@@ -164,28 +165,63 @@ $("restart").onclick=()=>{localStorage.removeItem(key);location.reload()};
 render();
 
 // Mantiene lo schermo acceso mentre Core 15 è visibile.
+// Strategia doppia per iPhone: Screen Wake Lock nativo + fallback video silenzioso.
 let wakeLock = null;
-async function keepScreenAwake(){
-  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+let legacyNoSleep = null;
+let legacyStarted = false;
+
+function setWakeStatus(text){
+  document.querySelectorAll(".version").forEach(el=>{
+    el.textContent = `Core 15 · v1.4 · ${text}`;
+  });
+}
+
+async function keepScreenAwakeNative(){
+  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return false;
   try {
-    if (wakeLock && !wakeLock.released) return;
+    if (wakeLock && !wakeLock.released) return true;
     wakeLock = await navigator.wakeLock.request("screen");
     wakeLock.addEventListener("release",()=>{ wakeLock = null; });
+    return true;
   } catch (err) {
     wakeLock = null;
+    return false;
   }
 }
-// Safari/WebKit su iPhone richiede un gesto dell’utente per concedere il Wake Lock.
-// Proviamo subito e poi, finché non è attivo, a ogni tocco/click reale dentro l’app.
-keepScreenAwake();
-async function wakeFromUserGesture(){
-  if (!wakeLock || wakeLock.released) await keepScreenAwake();
+
+function keepScreenAwakeLegacy(){
+  try {
+    if (!legacyNoSleep && typeof NoSleep !== "undefined") legacyNoSleep = new NoSleep();
+    if (legacyNoSleep && !legacyStarted) {
+      legacyNoSleep.enable(); // deve partire dentro un gesto utente
+      legacyStarted = true;
+    }
+    return legacyStarted;
+  } catch (err) {
+    legacyStarted = false;
+    return false;
+  }
 }
+
+async function wakeFromUserGesture(){
+  const nativeOk = await keepScreenAwakeNative();
+  const legacyOk = keepScreenAwakeLegacy();
+  setWakeStatus(nativeOk || legacyOk ? "SCHERMO ON" : "SCHERMO ?");
+}
+
+// Il fallback video su iOS deve essere avviato da un vero gesto dell'utente.
+setWakeStatus("tocca lo schermo");
 document.addEventListener("touchend",wakeFromUserGesture,{passive:true});
 document.addEventListener("pointerup",wakeFromUserGesture,{passive:true});
 document.addEventListener("click",wakeFromUserGesture,{passive:true});
+
+// Se torni nell'app, ritentiamo il lock nativo. Il fallback video riparte al primo tocco.
 document.addEventListener("visibilitychange",()=>{
-  if (document.visibilityState === "visible") keepScreenAwake();
+  if (document.visibilityState === "visible") {
+    keepScreenAwakeNative().then(ok=>{
+      if(ok) setWakeStatus("SCHERMO ON");
+    });
+  }
 });
 if("serviceWorker" in navigator){
   let reloadedForSW=false;

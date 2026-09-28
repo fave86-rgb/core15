@@ -22,7 +22,11 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
 .progress{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;margin:18px 0 8px}
 .seg{height:5px;border-radius:8px;background:#d5d1ca}.seg.done{background:#111}.seg.now{background:#74716c}
 .stage{flex:1;min-height:470px;display:flex;flex-direction:column;justify-content:center;text-align:center}
-.visual{height:245px;display:grid;place-items:center}
+.visual{height:245px;display:grid;place-items:center;position:relative;contain:layout paint style}
+.visual .frame{position:absolute;inset:0;display:grid;place-items:center}
+.visual .frameA{animation:coreFrameA 1.8s step-end infinite}.visual .frameB{animation:coreFrameB 1.8s step-end infinite}
+@keyframes coreFrameA{0%,49.99%{opacity:1}50%,100%{opacity:0}}@keyframes coreFrameB{0%,49.99%{opacity:0}50%,100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.visual .frame{animation:none}.visual .frameB{display:none}}
 .visual svg{width:min(88vw,370px);height:235px;overflow:visible}
 .floor{stroke:#c9c5be;stroke-width:4}.body{stroke:#111;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;fill:none}.head{fill:#111}
 .count{font-size:82px;font-weight:950;line-height:.88;letter-spacing:-4px}.unit{font-size:13px;font-weight:900;letter-spacing:2.4px;margin-top:10px}
@@ -56,15 +60,15 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
     </section>
     <div id="round" class="round"></div>
     <div class="bottom"><button id="prev" class="nav">‹</button><button id="done" class="done">FATTO</button><button id="next" class="nav">›</button></div>
-    <div class="version">Core 15 · v1.4</div>
+    <div class="version">Core 15 · v1.5</div>
   </div>
   <section id="finish" class="finish">
     <h1>Allenamento completato</h1><div id="duration" class="big"></div><p id="summary"></p>
-    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.4</div>
+    <button id="restart" class="action">RIFAI ALLENAMENTO</button><div class="version">Core 15 · v1.5</div>
   </section>
   <section id="restday" class="restday">
     <h1>Giorno di riposo</h1><div class="big">✓</div><p>Core 15 è programmato dal lunedì al venerdì. Oggi non devi recuperare nulla: il programma riparte automaticamente lunedì.</p>
-    <div class="version">Core 15 · v1.4</div>
+    <div class="version">Core 15 · v1.5</div>
   </section>
 </main>
 <div id="overlay" class="overlay">
@@ -73,7 +77,6 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
   <div class="restBtns"><button id="plus">+15 s</button><button id="skip" class="skip">SALTA</button></div>
   <div class="fb"><button data-v="Troppo facile">Troppo facile</button><button data-v="Giusto">Giusto</button><button data-v="Pesante">Pesante</button><button data-v="Fastidio">Fastidio</button></div>
 </div>
-<script src="https://unpkg.com/nosleep.js@0.9.0/dist/NoSleep.min.js"></script>
 <script>
 const ANCHOR = new Date(2026,8,7); // lunedì 7 settembre 2026 = Settimana 1
 const BASE = {
@@ -95,7 +98,7 @@ let absoluteWeek = Math.max(1,diffWeeks(now,ANCHOR)+1);
 let weekInCycle = ((absoluteWeek-1)%4)+1;
 let cycle = Math.floor((absoluteWeek-1)/4)+1;
 let key="core15-"+localKey(now);
-let idx=0,rest=0,timer=null,start=Date.now(),anim=0;
+let idx=0,rest=0,timer=null,start=Date.now();
 let saved=JSON.parse(localStorage.getItem(key)||"null");
 function dosesForToday(){
   const base=BASE[day].slice();
@@ -116,6 +119,7 @@ function art(t,s){
   if(t==="heels")return `<svg viewBox="0 0 360 220">${f}<circle class="head" cx="${s?120:150}" cy="115" r="18"/><path class="body" d="M${s?137:167} 128 L205 175 L275 175 M205 175 L245 135 L315 148 M180 145 L${s?100:155} 178"/></svg>`;
   return `<svg viewBox="0 0 360 220">${f}<circle class="head" cx="${s?145:185}" cy="80" r="18"/><path class="body" d="M${s?155:190} 98 L205 155 L265 185 M205 155 L150 188 M190 120 L${s?105:265} 135"/></svg>`;
 }
+function visualArt(t){return `<div class="frame frameA">${art(t,0)}</div><div class="frame frameB">${art(t,1)}</div>`}
 function render(){
   if(day===0||day===6){$("work").style.display="none";$("restday").classList.add("show");return}
   if(saved && saved.completed){showCompleted(saved.duration||0);return}
@@ -123,11 +127,10 @@ function render(){
   $("meta").innerHTML=`${now.toLocaleDateString("it-IT",{weekday:"long",day:"numeric",month:"long"})}<br><strong>Settimana ${weekInCycle}</strong> · Giorno ${day} · Ciclo ${cycle}`;
   $("count").textContent=doses[e];$("unit").textContent=EX[e][1];$("name").textContent=EX[e][0];$("cue").textContent=EX[e][2];
   $("round").textContent=`GIRO ${r}/3 · ESERCIZIO ${e+1}/4`;
-  $("visual").innerHTML=art(EX[e][3],anim);
+  $("visual").innerHTML=visualArt(EX[e][3]);
   $("progress").innerHTML=Array.from({length:12},(_,i)=>`<span class="seg ${i<idx?'done':i===idx?'now':''}"></span>`).join("");
   localStorage.setItem(key,JSON.stringify({idx,completed:false,week:weekInCycle,cycle,doses}));
 }
-setInterval(()=>{if(day>=1&&day<=5&&!$("overlay").classList.contains("show")&&!$("finish").classList.contains("show")){anim=anim?0:1;$("visual").innerHTML=art(EX[idx%4][3],anim)}},850);
 function advance(){
   clearInterval(timer);$("overlay").classList.remove("show");idx++;
   document.querySelectorAll(".fb button").forEach(x=>x.classList.remove("sel"));
@@ -157,6 +160,7 @@ function showCompleted(sec){
 }
 function finishWorkout(){
   clearInterval(timer);$("overlay").classList.remove("show");
+  releaseWakeLock();
   let sec=Math.max(0,Math.round((Date.now()-start)/1000));
   localStorage.setItem(key,JSON.stringify({idx:12,completed:true,duration:sec,week:weekInCycle,cycle,doses}));
   saved={completed:true,duration:sec};showCompleted(sec);
@@ -164,64 +168,58 @@ function finishWorkout(){
 $("restart").onclick=()=>{localStorage.removeItem(key);location.reload()};
 render();
 
-// Mantiene lo schermo acceso mentre Core 15 è visibile.
-// Strategia doppia per iPhone: Screen Wake Lock nativo + fallback video silenzioso.
+// Mantiene lo schermo acceso durante un allenamento attivo usando solo la Screen Wake Lock API nativa.
 let wakeLock = null;
-let legacyNoSleep = null;
-let legacyStarted = false;
+let wakeRequestPending = false;
+let wakeDesired = day>=1 && day<=5 && !(saved && saved.completed);
 
 function setWakeStatus(text){
   document.querySelectorAll(".version").forEach(el=>{
-    el.textContent = `Core 15 · v1.4 · ${text}`;
+    el.textContent = `Core 15 · v1.5 · ${text}`;
   });
 }
 
-async function keepScreenAwakeNative(){
-  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return false;
-  try {
-    if (wakeLock && !wakeLock.released) return true;
-    wakeLock = await navigator.wakeLock.request("screen");
-    wakeLock.addEventListener("release",()=>{ wakeLock = null; });
-    return true;
-  } catch (err) {
-    wakeLock = null;
+async function requestWakeLock(){
+  if(!wakeDesired || document.visibilityState!=="visible" || !("wakeLock" in navigator)){
+    setWakeStatus("SCHERMO AUTO");
     return false;
   }
-}
-
-function keepScreenAwakeLegacy(){
-  try {
-    if (!legacyNoSleep && typeof NoSleep !== "undefined") legacyNoSleep = new NoSleep();
-    if (legacyNoSleep && !legacyStarted) {
-      legacyNoSleep.enable(); // deve partire dentro un gesto utente
-      legacyStarted = true;
-    }
-    return legacyStarted;
-  } catch (err) {
-    legacyStarted = false;
-    return false;
-  }
-}
-
-async function wakeFromUserGesture(){
-  const nativeOk = await keepScreenAwakeNative();
-  const legacyOk = keepScreenAwakeLegacy();
-  setWakeStatus(nativeOk || legacyOk ? "SCHERMO ON" : "SCHERMO ?");
-}
-
-// Il fallback video su iOS deve essere avviato da un vero gesto dell'utente.
-setWakeStatus("tocca lo schermo");
-document.addEventListener("touchend",wakeFromUserGesture,{passive:true});
-document.addEventListener("pointerup",wakeFromUserGesture,{passive:true});
-document.addEventListener("click",wakeFromUserGesture,{passive:true});
-
-// Se torni nell'app, ritentiamo il lock nativo. Il fallback video riparte al primo tocco.
-document.addEventListener("visibilitychange",()=>{
-  if (document.visibilityState === "visible") {
-    keepScreenAwakeNative().then(ok=>{
-      if(ok) setWakeStatus("SCHERMO ON");
+  if(wakeLock && !wakeLock.released) return true;
+  if(wakeRequestPending) return false;
+  wakeRequestPending=true;
+  try{
+    wakeLock=await navigator.wakeLock.request("screen");
+    setWakeStatus("SCHERMO ON");
+    wakeLock.addEventListener("release",()=>{
+      wakeLock=null;
+      if(wakeDesired && document.visibilityState==="visible") setWakeStatus("SCHERMO AUTO");
     });
+    return true;
+  }catch(err){
+    wakeLock=null;
+    setWakeStatus("SCHERMO AUTO");
+    return false;
+  }finally{
+    wakeRequestPending=false;
   }
+}
+
+async function releaseWakeLock(){
+  wakeDesired=false;
+  if(wakeLock && !wakeLock.released){
+    try{await wakeLock.release()}catch(err){}
+  }
+  wakeLock=null;
+  setWakeStatus("SCHERMO AUTO");
+}
+
+if(wakeDesired){
+  setWakeStatus("SCHERMO AUTO");
+  requestWakeLock();
+  document.addEventListener("pointerdown",requestWakeLock,{once:true,passive:true});
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible" && wakeDesired) requestWakeLock();
 });
 if("serviceWorker" in navigator){
   let reloadedForSW=false;
